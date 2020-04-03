@@ -1,7 +1,7 @@
 <?php
 /*
 Plugin Name: BuddyPress Capture User Meta
-Plugin URI: https://github.com/?
+Plugin URI: https://github.com/websavers/BuddyPress-Capture-User-Meta-to-xprofile
 Description: Captures standard update_user_meta() calls, detects when the key starts with bp_, and inserts the data to the xprofile field instead of the usermeta table
 Version: 1.0
 Author: Websavers Inc

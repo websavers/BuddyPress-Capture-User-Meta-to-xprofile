@@ -24,31 +24,86 @@ class bp_um2xp {
 		
 		// User Meta Interceptor!
 		// https://codex.wordpress.org/Plugin_API/Filter_Reference/update_(meta_type)_metadata
+		// Meta field requests MUST use syntax bp_<xprofile_field_name>
+		// https://core.trac.wordpress.org/browser/tags/5.4/src/wp-includes/meta.php
 		add_filter( 'update_user_metadata', array( $this, 'intercept_update_user_meta'), 10, 5 );
+		add_filter( 'get_user_metadata', array( $this, 'intercept_get_user_meta'), 10, 4 );
+		
+		// Admin Warnings / Alerts
+		add_action( 'admin_notices', array( $this, 'show_warning_if_no_buddypress' ) );
 
 	} // end constructor
 
 	/** 
 	** This filter intervenes on update_user_meta calls so we can save the user 
 	** meta data to the BuddyPress xprofile field instead.
-	** Meta field requests MUST use syntax bp_<xprofile_field_name>
 	**/
-	private function intercept_update_user_meta( $null, $object_id, $meta_key, $meta_value, $prev_value ) {
-
+	public function intercept_update_user_meta( $null, $object_id, $meta_key, $meta_value, $prev_value ) {
+		
 		if ( $this->startsWith($meta_key, 'bp_') && !empty( $meta_value ) ) {
 			
-			$field_id = BP_XProfile_Field::get_id_from_name( str_replace('bp_', '', $meta_key) );
+			//error_log("Meta Key=Value: $meta_key=$meta_value", 0); ///DEBUG
+						
+			$field_id = (int) str_replace('bp_field_', '', $meta_key);
 			
-			$bp_xprofile_field = new BP_XProfile_Field($field_id);
-			$bp_xprofile_field->data = $meta_value;
-			$bp_xprofile_field->save();
+			//error_log("xprofile field ID: $field_id", 0); ///DEBUG
 			
-			return true; // Do not save the value into the WP meta database because we're saving it to the BuddyPress profile instead.
+			if ( is_int($field_id) ){
+				
+				$bp_xprofile_field = new BP_XProfile_ProfileData($field_id, get_current_user_id());
+				$bp_xprofile_field->value = $meta_value;
+				$bp_xprofile_field->save();
+				unset($bp_xprofile_field);
+				
+				//delete_user_meta( get_current_user_id(), $meta_key );
+				
+				return true; 
+				// Returning true is supposed to prevent saving to the usermeta table 
+				// However our data still is being added to usermeta. 
+				
+			}
 			
 		}
 
 		return null; // this means: go on with the normal execution in meta.php
 
+	}
+	
+	/** 
+	** This filter intervenes on get_user_meta calls so we can retrieve the user 
+	** meta data from the BuddyPress xprofile field instead.
+	**/
+	public function intercept_get_user_meta( $null, $object_id, $meta_key, $single ) {
+		
+		if ( $this->startsWith($meta_key, 'bp_') ) {
+			
+			//error_log("Meta Key=Value: $meta_key=$meta_value", 0); ///DEBUG
+						
+			$field_id = (int) str_replace('bp_field_', '', $meta_key);
+			
+			//error_log("xprofile field ID: $field_id", 0); ///DEBUG
+			
+			if ( is_int($field_id) ){
+				
+				$bp_xprofile_field = new BP_XProfile_ProfileData($field_id, get_current_user_id());
+				$meta_value = $bp_xprofile_field->value;
+				unset($bp_xprofile_field);
+				
+				return $meta_value;
+												
+			}
+			
+		}
+
+		return null; // this means: go on with the normal return value and execution in meta.php
+
+	}
+	
+	public static function show_warning_if_no_buddypress(){
+		// instantiate plugin's class only if BuddyPress is active.
+		if ( ! is_plugin_active( 'buddypress/bp-loader.php' ) ){
+			echo __("<div class='notice notice-warning'><p>The BuddyPress capture user meta plugin requires BuddyPress. Install BuddyPress for its functionality to work.</p></div>", 'bp_um2xp');
+		}
 	}
 	
 	private function startsWith ($string, $startString) { 
@@ -59,6 +114,4 @@ class bp_um2xp {
 }
 
 // instantiate plugin's class only if BuddyPress is active.
-if ( is_plugin_active( 'buddypress' ) ){
-	$GLOBALS['bp_um2xp'] = new bp_um2xp(); //create
-}
+if ( is_plugin_active( 'buddypress/bp-loader.php' ) ) $GLOBALS['bp_um2xp'] = new bp_um2xp(); //create

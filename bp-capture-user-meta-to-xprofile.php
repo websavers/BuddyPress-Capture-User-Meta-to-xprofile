@@ -40,6 +40,8 @@ class bp_um2xp {
 	**/
 	public function intercept_update_user_meta( $null, $object_id, $meta_key, $meta_value, $prev_value ) {
 		
+		$retval = null;
+		
 		if ( $this->startsWith($meta_key, 'bp_') && !empty( $meta_value ) ) {
 			
 			//error_log("Meta Key=Value: $meta_key=$meta_value", 0); ///DEBUG
@@ -57,7 +59,7 @@ class bp_um2xp {
 				
 				//delete_user_meta( get_current_user_id(), $meta_key );
 				
-				return true; 
+				$retval = true;
 				// Returning true is supposed to prevent saving to the usermeta table 
 				// However our data still is being added to usermeta. 
 				
@@ -65,7 +67,7 @@ class bp_um2xp {
 			
 		}
 
-		return null; // this means: go on with the normal execution in meta.php
+		return $retval; // this means: go on with the normal execution in meta.php
 
 	}
 	
@@ -86,8 +88,12 @@ class bp_um2xp {
 			if ( is_int($field_id) ){
 				
 				$bp_xprofile_field = new BP_XProfile_ProfileData($field_id, get_current_user_id());
-				$meta_value = $bp_xprofile_field->value;
+				$meta_value = maybe_unserialize($bp_xprofile_field->value);
 				unset($bp_xprofile_field);
+				
+				if ( is_array($meta_value) ){
+					$meta_value = implode(', ', $meta_value); //csv
+				}
 				
 				return $meta_value;
 												
